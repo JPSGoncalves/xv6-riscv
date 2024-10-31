@@ -20,6 +20,55 @@ used for unmatched specific changes:
 A single define selection is all that is needed but not sure if VS code can properly notice the one in Makefile to help with
 its code highlighting features.
 
+# Quick Start
+
+Interrupt the Unmatched boot process by pressing a key on the USB UART debug terminal while it is in Uboot. This starts
+the uboot command interface where it is possible to load and run a binary file (the xv6 kernel binary given as a release or
+produced via recompile of the source code).
+
+For example, my 'kernel.bin' file is in my home directory on my nvme drive. Uboot allows me to reference it referenced
+to the root of nvme device 0. The unmatched.ld linker file begins the text segment at 0x80400000.
+
+At uboot command prompt:  
+
+=> load nvme 0 0x80400000 home/raykj/kernel.bin
+
+2078808 bytes read in 2 ms (991.3 MiB/s)
+
+Now, tell uboot to start running at _entry which is at 0x80400000:
+
+=> go 0x80400000
+
+If you dont have an nvme ssd drive, then you can reference a fat32 file on the SD card. The load command is different:
+
+At uboot command prompt:
+
+=> fatload mmc 0:3 0x80400000 kernel.bin
+
+mmc manages the SD card and the fat32 partition is (usually partition 3)
+
+then issue the go command as before:
+
+=> go 0x80400000
+
+This is essentially the same as how Linux boots, except instead of (automatically) loading the Linux kernel file, we 
+manually command Uboot to load the xv6 file at a particular address and then run at that address. It should be possible
+to modify uboot scripts to automatically load xv6 file and run it but that part isnt a focus for me. Another option is
+to replace the uboot run time with xv6 instead of uboot but that doesnt really gain us anything. Of possible interest is
+to one day replace the uboot spl image with xv6 so that xv6 could start in machine mode, but that requires porting all
+the platform initialization code and, while interesting, is distracting to my goals here.
+
+For me, the interest is in better understanding the RISCV architecture, especially the privileged part relating to Virtual 
+Memory and trapping (you can do anything in a trap service routine, even extend the instruction set!).
+
+The real fun comes from building the code, making changes to it and debugging at a source code and low level (please see
+the debug section).
+
+I picked the Unmatched platform because it is well documented and, owing to SiFive being the manufacturer, a sort of
+standard platform that others build from or understand. Plus, they recently (Sept 2024?) reduced the price to $299 owing to their
+P550 platform release ($599 at time of publication). That price is high but you get a lot with this board, although what
+you dont get is any kind of gaming performance!
+
 # Current Limitations
 
 ## Use of Ramdisk
@@ -100,7 +149,7 @@ So far, I've use the openocd telnet debugger to examine registers and memory whe
 
 So the standard debug routine is as follows:
 
-Run putty on ttyusb1 at 115200 for terminal (same as terminal debug for linux)
+Run putty, serial, on ttyusb1 at 115200 for a terminal (same as terminal debug for linux).
 
 - power board to boot unmatched to its uboot prompt (press a key to stop it launching Linux)
 - launch openocd (which halts uboot)
@@ -168,6 +217,16 @@ to the user satp (visible in the xv6 process structure). Be sure to format it co
 kernel breakpoint after looking at some user memory. This is the best way I found for examining user variables since gdb isnt
 user friendly (yet).
 
+On my unmatched board, I was unable to use the default USB Jtag interface. The Unmatched USB has 2 ports: UART and Jtag.
+The UART port is on ttyUSB1 (Debian) and works fine. But I could not get a stable connection on the Jtag port using any openocd config
+that I could find or edit. I opened a ticket on this with SiFive and got confirmation that the problem was repeatable. But no
+solution. So luckily, the board has a 2nd Jtag port that can be accessed with a jumper connection. But BE CAREFUL this port
+requires the debugger interface to work at 1.8v and not all cheap adapters either observe the 'VTRef' pin (set to 1.8v on
+unmatched or they only run at 3.3v or worse). I have an older Jlink 'EDU' model that does work at 1.8v and does observe the
+VTRef pin. But Segger's replacement EDU model is hardware strapped to 3.3v according to documentation that I've read. If so,
+this wil likely fry the unmatched Jtag mux (or worse). This is unfortunate because the Segger EDU adapter is otherwise
+reasonably priced.
+
 ## GDB debugging
 
 - info threads  
@@ -178,3 +237,68 @@ is needed to determine the state of the harts. Note that thread 1 is hart 0, 2 i
 is used to set a break at a label, e.g. break main
 - p /x variable  
 This one is really useful in user trap.c to print *p and *p->trapframe to examine the process state and user state at the trap.
+
+# Non XV6 stuff
+
+## Uboot tips
+
+help is your friend - it shows all the available commands. In the quick start section, I used a couple of them and, in 
+addition to getting a full list of commands you can ask for help on any of them individually. For example:
+
+=> help fatls  
+fatls - list files in a directory (default /)  
+
+Usage:  
+fatls <interface> [<dev[:part]>] [directory]  
+    - list files from 'dev' on 'interface' in a 'directory'  
+
+So to check that you have the right parameters for load, you can do a fatls first:  
+
+=> fatls mmc 0:3  
+   247608   config-6.10.6-riscv64  
+            extlinux/  
+    11115   hifive-unmatched-a00.dtb  
+ 38485527   initrd.img-6.10.6-riscv64  
+            lost+found/  
+       83   System.map-6.10.6-riscv64  
+ 26887168   vmlinux-6.10.6-riscv64  
+   540720   kernel  
+   303632   kernel.bin  
+
+7 file(s), 2 dir(s)  
+
+Here, you can see a (random) kernel.bin that I had on the root partition of a bootable SD card. I also had the kernel
+elf file but the bin file works fine here (no advantage for debug symbols without the Jtag debugger).
+
+## Misc Unmatched setup
+
+I dont use a graphics card with my unmatched. Its not a gaming platform, or at least I'm not using it for that.
+
+When I run Linux, I use the network interface to either ssh in or run X2Go server within Linux and X2Go Client on my remote machine. For the server side, I choose openbox which runs well with X2Go and I can live with it.
+
+X2Go client gives me a full X11 graphics interface and its reasonably fast.
+
+I've installed Uboot SPL and UBoot to the onboard SPI Flash. So no need for the SD card to get into Linux unless SPI gets corrupted. These have remained untouched through all of my Xv6 debug sessions by virtue of using the provided SBI facilities
+and Uboot to either launch XV6 or its (supervisor) Jtag environment to load into and run from there. Xv6 is not transitioning
+from machine mode to supervisor mode and there are 'enough privs' enabled by uboot to do anything we need memory, interrupt
+or IO wise. My thinking here is that if Linux runs, so can we!
+
+
+## My Debian Linux setup on Unmatched
+
+When not running xv6, I'm running Debian Linux installed on a NVMe SSD. I'll try to follow up with info on how all of that got
+set up in case its relevent or useful but I believe this code will run fine when loaded from the uboot prompt of the SD Card.
+
+What I can say is that it was surprisingly easy to get Debian (SID) running with its vast prebuilt packages available. The
+only downside presently is that since RISCV is only supported with their SID (experimental) release its hard to reference
+a particular stable release in case the latest has some problem.
+
+## Jtag curiosities with Linux (not XV6 related)
+
+Its cool to start Jtag while running Linux. I can easily see whats happening under the hood. For example, Hart 0 is happily
+still running in OpenSBI (at a wfi instruction) and the 4 other harts are doing all kinds of stuff with their own page tables. Debugging Linux
+at this level is an artform given it runs with its own non unity mapped page tables so its a bit more challenging to
+see where it is in the code but thats maybe something for another time. If one hangs out too long at a breakpoint, Linux
+gets upset upon resumption with various watchdogs killing the process.Linux maintains time of day, so its certainly not counting interrupts to tell the time (duh). Surprisingly, ssh sessions remain connected for a long time at a Jtag breakpoint
+unless you try to type into the terminal session. Then it knows something is up.
+
