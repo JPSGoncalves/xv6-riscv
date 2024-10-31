@@ -14,8 +14,8 @@ instead of Linux. Either run in RISCV supervisor mode and make use of the memory
 The modifications are fairly minor with a define selection in Makefile and a corresponding one in param.h. A second define is
 used for unmatched specific changes:
 
-SUPPORT_SBI -- enables branch specific changes relating to OpenSBI
-SUPPORT_UNMATCHED -- enable any unmatched specific changes (which may not be essential but used while debugging).
+- SUPPORT_SBI -- enables branch specific changes relating to OpenSBI
+- SUPPORT_UNMATCHED -- enable any unmatched specific changes (which may not be essential but used while debugging).
 
 A single define selection is all that is needed but not sure if VS code can properly notice the one in Makefile to help with
 its code highlighting features.
@@ -51,9 +51,12 @@ Here I list stuff that I have not yet resolved
 
 ## An oddity with SMP
 
-This version launches all 4 cores and they seem functional. But I'm not yet sure if there is a problem. I would have expected
+This version launches all 4 U74 cores (Harts) and they seem functional. But I'm not yet sure if there is a problem. I would have expected
 the cores to be at a "wfi" instruction awaiting an interrupt (keypress or timer) when idle. I believe the initial core
 does wait at wfi but the other ones seem to hang out in r_sstatus() when I debug so thats another thread to pull on.
+
+Note that, like Linux, the S7 core (hart 0) is left at a wfi in OpenSBI. This core does not have supervisor support and therefore can not
+run Xv6 or Linux. But it is sometimes useful to peek at unmapped physical memory from OpenOCD (while debugging).
 
 ## usertests
 
@@ -62,11 +65,11 @@ are cleverly written with expected results (including for faults).
 
 I've met my match with the failure of one particular test on unmatched: sbrkmuch() within usertests.c. This test runs fine:
 
-(a) occasionally (unmodified). Run the test a few times in a row from the command prompt.
-(b) when run standalone (via command line parameter to just run sbrkmuch).
-(c) when its moved from its normal compiled address (!) even slightly. I'm including a modified version of usertests
+- occasionally (unmodified). Run the test a few times in a row from the command prompt.
+- when run standalone (via command line parameter to just run sbrkmuch).
+- when its moved from its normal compiled address (!) even slightly. I'm including a modified version of usertests
 called usertests2 that simply reverses the order of two tests (sbrkmuch and sbrkbasic) and it passes all the time.
-(d) of course, in the original MIT QEMU emulation.
+- of course, in the original MIT QEMU emulation.
 
 I've tried everything I can think of to debug this and am close to saying there must be some unpublished Fu740 fault involving
 cache or virtual memory or something.
@@ -85,8 +88,8 @@ that I cant seem to figure it out.
 
 I'm a big fan of Jtag, so I use riscv64-unknown-linux-gnu-gdb with target remote session to openocd. This works well for
 
-(a) code load of the kernel elf via Jtag
-(b) setting breakpoints anywhere in the kernel and inspecting kernel variables at the breakpoint.
+- code load of the kernel elf via Jtag
+- setting breakpoints anywhere in the kernel and inspecting kernel variables at the breakpoint.
 
 But gdb doesnt work well for user code debugging. For one thing, user code runs using virtual memory remapping and for another
 the paging remapping protects against writing to code space which gdb does (TODO: try modifying xv6 to allow writing to user code space,
@@ -99,25 +102,22 @@ So the standard debug routine is as follows:
 
 Run putty on ttyusb1 at 115200 for terminal (same as terminal debug for linux)
 
-0 -- power board to boot unmatched to its uboot prompt (press a key to stop it launching Linux)
-
-1 -- launch openocd (which halts uboot)
+- power board to boot unmatched to its uboot prompt (press a key to stop it launching Linux)
+- launch openocd (which halts uboot)
 
 $ openocd -f openocd-jlink.cfg
 
-2 -- laucnch telnet 
+- launch telnet 
 
 $ telnet localhost 4444 to estabilsh a debug window for user code
 
-3 -- launch gdb 
+- launch gdb 
 
 $ riscv64-unknown-linux-gnu-gdb kernel
 
 (gdb) target extended-remote :3333 
 
-as its first command 
-
-Ctitical: choose the active thread. This is the one that opensbi was running uboot on and is random. I use the gdb command:
+Critical: choose the active thread. This is the one that opensbi was running uboot on and is random. I use the gdb command:
 
 (gdb) info threads
 
@@ -125,7 +125,7 @@ to tell which thread was running uboot. Its the only thread with address 0xfffxx
 
 (gdb) thread X
 
-where X is the thread identified above. Critically, this thread will have a valid 'tp' that identifies the running HART.
+where X is the numeric thread identified above. Critically, this thread will have a valid 'tp' that identifies the running HART.
 
 Its a pain to identify the running HART at xv6 launch so this code continues to rely on that to be true. Uboot does this by
 default when running from its command prompt so it should be possible to boot xv6 binary without a debugger. But if necessary,
@@ -138,10 +138,43 @@ Then
 
 And xv6 should appear on the terminal
 
-xv6 kernel is booting
+xv6 kernel is booting  
+  
+hart 2 starting  
+hart 4 starting  
+hart 1 starting  
+init: starting sh  
+$  
 
-hart 2 starting
-hart 4 starting
-hart 1 starting
-init: starting sh
-$
+## OpenOCD debugging
+
+The telnet window can be used to set hardware breakpoints, examine registers and memory via its commands. I use:
+
+- targets (N)  
+command to switch threads. Note that numbering is 0 based in Openocd wheras it is 1 based in gdb.
+- reg (reg name) 
+command to examine and change registers (e.g. reg sepc, reg satp)
+- mdh, mdd, mdb  
+commands to dump memory (32 bit, 64 bit, 8 bit)
+- resume  
+command to continue processing. Note that I prefer using gdb's 'cont' command so that it stays in sync with the code better
+- bp 0x(address) N hw  
+command sets a hardware breakpoint at address range address..address+N (I think). I usually set N to the
+byte size of the instruction that I want to break on
+
+Note that it is possible to "look at" user contexts even after stopping at a kernel breakpoint by setting the thread's satp register
+to the user satp (visible in the xv6 process structure). Be sure to format it correctly with the ms nibble as '8' and omit the lower
+3 nibbles (000) or 12 bits since the satp is a page address. I generally save the kernel satp in case I want to resume a
+kernel breakpoint after looking at some user memory. This is the best way I found for examining user variables since gdb isnt
+user friendly (yet).
+
+## GDB debugging
+
+- info threads  
+is needed to determine the state of the harts. Note that thread 1 is hart 0, 2 is hart 1 etc.
+- thread N  
+ is needed to switch thread context
+- break label  
+is used to set a break at a label, e.g. break main
+- p /x variable  
+This one is really useful in user trap.c to print *p and *p->trapframe to examine the process state and user state at the trap.
