@@ -114,8 +114,10 @@ I've met my match with the failure of one particular test on unmatched: sbrkmuch
 
 - occasionally (unmodified). Run the test a few times in a row from the command prompt.
 - when run standalone (via command line parameter to just run sbrkmuch).
-- when its moved from its normal compiled address (!) even slightly. I'm including a modified version of usertests
-called usertests2 that simply reverses the order of two tests (sbrkmuch and sbrkbasic) and it passes all the time.
+- when its moved or called differently from its original version.
+
+Please refer to usertests2 which reverses the call order of sbrkbasic and sbrkmuch with no other changes. Both versions are on the supplied ramdisk.
+
 - of course, in the original MIT QEMU emulation.
 
 I've tried everything I can think of to debug this and am close to saying there must be some unpublished Fu740 fault involving
