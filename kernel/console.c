@@ -33,12 +33,21 @@
 void
 consputc(int c)
 {
+#ifdef RUNTIME_SBI
+  if(c == BACKSPACE){
+    // if the user typed backspace, overwrite with a space.
+    sbi_console_putchar('\b'); sbi_console_putchar(' '); sbi_console_putchar('\b');
+  } else {
+    sbi_console_putchar(c);
+  }
+#else
   if(c == BACKSPACE){
     // if the user typed backspace, overwrite with a space.
     uartputc_sync('\b'); uartputc_sync(' '); uartputc_sync('\b');
   } else {
     uartputc_sync(c);
   }
+#endif
 }
 
 struct {
@@ -64,7 +73,11 @@ consolewrite(int user_src, uint64 src, int n)
     char c;
     if(either_copyin(&c, user_src, src+i, 1) == -1)
       break;
+#ifdef RUNTIME_SBI
+    sbi_console_putchar(c);
+#else
     uartputc(c);
+#endif
   }
 
   return i;
@@ -183,7 +196,9 @@ consoleinit(void)
 {
   initlock(&cons.lock, "cons");
 
+#ifndef RUNTIME_SBI
   uartinit();
+#endif
 
   // connect read and write system calls
   // to consoleread and consolewrite.

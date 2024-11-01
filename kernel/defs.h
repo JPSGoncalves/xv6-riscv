@@ -185,5 +185,27 @@ void            virtio_disk_init(void);
 void            virtio_disk_rw(struct buf *, int);
 void            virtio_disk_intr(void);
 
+// ram_disk.c
+void            ram_disk_init(void);
+void            ram_disk_rw(struct buf*, int write);
+
+// start.c
+void timerinit(void);
+
+// sbi.c
+void sbi_console_putchar(int ch);
+int sbi_console_getchar(void);
+void sbi_set_timer(uint64);
+void sbi_shutdown(void);
+void sbi_clear_ipi(void);
+void sbi_send_ipi(const unsigned long*);
+void sbi_remote_fence_i(const unsigned long*);
+long sbi_remote_sfence_vma(const unsigned long*, unsigned long, unsigned long size);
+void sbi_remote_sfence_vma_asid(const unsigned long*, unsigned long, unsigned long, unsigned long);
+void sbi_set_extern_interrupt(unsigned long);
+void sbi_set_mie(void);
+void sbi_hart_start(unsigned long, unsigned long);
+unsigned long sbi_hart_get_status(unsigned long);
+
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

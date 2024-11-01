@@ -27,8 +27,10 @@ kvmmake(void)
   // uart registers
   kvmmap(kpgtbl, UART0, UART0, PGSIZE, PTE_R | PTE_W);
 
+#ifndef RUNTIME_SBI
   // virtio mmio disk interface
   kvmmap(kpgtbl, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+#endif
 
   // PLIC
   kvmmap(kpgtbl, PLIC, PLIC, 0x4000000, PTE_R | PTE_W);
@@ -162,7 +164,12 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
       return -1;
     if(*pte & PTE_V)
       panic("mappages: remap");
+#ifdef RUNTIME_SBI
+    // siFive cores will page fault on code already present (cant set satp on previously loaded code) without A bit
+    *pte = PA2PTE(pa) | perm | PTE_V | PTE_A | PTE_D;
+#else
     *pte = PA2PTE(pa) | perm | PTE_V;
+#endif
     if(a == last)
       break;
     a += PGSIZE;

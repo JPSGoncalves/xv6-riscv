@@ -8,12 +8,23 @@ void main();
 void timerinit();
 
 // entry.S needs one stack per CPU.
+// RUNTIME_SBI defines the stack in entry_sbi.S for better control of location
+#ifndef RUNTIME_SBI
 __attribute__ ((aligned (16))) char stack0[4096 * NCPU];
+#endif
 
 // entry.S jumps here in machine mode on stack0.
 void
 start()
 {
+#ifdef RUNTIME_SBI
+  // skip all the machine mode initialization
+  
+  // dont need SEIE until we fool with the UART
+  w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
+  // ask for clock interrupts.
+  timerinit();
+#else
   // set M Previous Privilege mode to Supervisor, for mret.
   unsigned long x = r_mstatus();
   x &= ~MSTATUS_MPP_MASK;
@@ -46,12 +57,16 @@ start()
 
   // switch to supervisor mode and jump to main().
   asm volatile("mret");
+#endif
 }
 
 // ask each hart to generate timer interrupts.
 void
 timerinit()
 {
+#ifdef RUNTIME_SBI
+  sbi_set_timer(r_time() + 1000000);
+#else
   // enable supervisor-mode timer interrupts.
   w_mie(r_mie() | MIE_STIE);
   
@@ -63,4 +78,5 @@ timerinit()
   
   // ask for the very first timer interrupt.
   w_stimecmp(r_time() + 1000000);
+#endif
 }

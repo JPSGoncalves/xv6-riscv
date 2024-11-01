@@ -24,6 +24,10 @@ struct cpu {
   struct context context;     // swtch() here to enter scheduler().
   int noff;                   // Depth of push_off() nesting.
   int intena;                 // Were interrupts enabled before push_off()?
+#ifdef RUNTIME_SBI
+  int isboothart;             // if nonzero, this CPU is the boot hart and
+                              // handles extra duties (e.g. timer)
+#endif
 };
 
 extern struct cpu cpus[NCPU];

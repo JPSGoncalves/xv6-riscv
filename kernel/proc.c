@@ -56,6 +56,12 @@ procinit(void)
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
   }
+#ifdef RUNTIME_SBI
+  int id = cpuid();
+  // only the boot hart runs procinit()
+  // wanted to write hartid but less compatible
+  cpus[id].isboothart = 1;
+#endif
 }
 
 // Must be called with interrupts disabled,

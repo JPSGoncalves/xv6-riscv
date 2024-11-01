@@ -11,14 +11,9 @@ The other problem with messing with the SPL is it contains all the board (e.g. D
 what we are doing here is interrupting Linux boot by pressing a key while it is in uboot and loading this image
 instead of Linux. Either run in RISCV supervisor mode and make use of the memory resident sbi that uboot and Linux uses.
 
-The modifications are fairly minor with a define selection in Makefile and a corresponding one in param.h. A second define is
-used for unmatched specific changes:
+The modifications are fairly minor with a define selection in Makefile and a corresponding one in param.h. 
 
-- SUPPORT_SBI -- enables branch specific changes relating to OpenSBI
-- SUPPORT_UNMATCHED -- enable any unmatched specific changes (which may not be essential but used while debugging).
-
-A single define selection is all that is needed but not sure if VS code can properly notice the one in Makefile to help with
-its code highlighting features.
+- RUNTIME_SBI -- enables branch specific changes relating to OpenSBI  
 
 # Quick Start
 
@@ -30,32 +25,34 @@ For example, my 'kernel.bin' file is in my home directory on my nvme drive. Uboo
 to the root of nvme device 0. The unmatched.ld linker file begins the text segment at 0x80400000.
 
 At uboot command prompt:  
-
+```
 => load nvme 0 0x80400000 home/raykj/kernel.bin
 
 2078808 bytes read in 2 ms (991.3 MiB/s)
-
+```
 Now, tell uboot to start running at _entry which is at 0x80400000:
-
+```
 => go 0x80400000
-
+```
 If you dont have an nvme ssd drive, then you can reference a fat32 file on the SD card. The load command is different:
 
 At uboot command prompt:
-
+```
 => fatload mmc 0:3 0x80400000 kernel.bin
-
+```
 mmc manages the SD card and the fat32 partition is (usually partition 3)
 
 then issue the go command as before:
-
+```
 => go 0x80400000
+```
 
-This is essentially the same as how Linux boots, except instead of (automatically) loading the Linux kernel file, we 
-manually command Uboot to load the xv6 file at a particular address and then run at that address. It should be possible
-to modify uboot scripts to automatically load xv6 file and run it but that part isnt a focus for me. Another option is
+This is essentially the same way that Linux boots, except instead of (automatically) loading the Linux kernel file, we 
+manually command Uboot to load the xv6 file at a particular address and then run at that address. 
+
+It should be possible to modify uboot scripts to automatically load xv6 file and run it if desired. Another option is
 to replace the uboot run time with xv6 instead of uboot but that doesnt really gain us anything. Of possible interest is
-to one day replace the uboot spl image with xv6 so that xv6 could start in machine mode, but that requires porting all
+to one day replace the uboot spl image with xv6 so that native xv6 could start in machine mode, but that requires porting all
 the platform initialization code and, while interesting, is distracting to my goals here.
 
 For me, the interest is in better understanding the RISCV architecture, especially the privileged part relating to Virtual 
@@ -82,6 +79,8 @@ version simply uses a ramdisk version of the default filesystem that gets create
 generate ram_disk.h which is included by ram_disk.c that provides the block r/w functionality but does not change any OS caching
 complexities.
 
+The VF2 port also has more extensive differences from the latest xv6 official release.
+
 ## Use of sbi console for UART
 
 This build also cheats by avoiding the implementation of a UART driver (for now). This works fine for output but for input
@@ -89,8 +88,7 @@ we must poll the SBI API for any characters. Since the clock interrupts are comi
 any waiting character within the clock interrupt and push any into the console buffer if found. The hardware buffers a few
 characters so even if one types faster than 10x per second they should not be lost.
 
-Later, I made a minor SUPPORT_UNMATCHED efficiency change to simply look at the uart register status directly. This was part
-of a debug process where I was trying to cut back on SBI calls. The right way to do that is to adapt the MIT Uart driver
+The right way to do the console that is to adapt the xv6 Uart driver
 (16550 based) to use the Unmatched hardware (sifive IP). The Sifive hardware is much simpler so this should be easy but not yet
 done in this version.
 
@@ -133,6 +131,8 @@ BTW, I've found that its very difficult on this chip to tell how it got to a par
 buffer so I've resorted to leaving breadcrumbs and cycling thru (user and sometimes kernel) code changes and rebuilds to conclude
 that I cant seem to figure it out.
 
+xv6 nicely traps the error and never crashes however.
+
 # Debugging
 
 I'm a big fan of Jtag, so I use riscv64-unknown-linux-gnu-gdb with target remote session to openocd. This works well for
@@ -145,7 +145,7 @@ the paging remapping protects against writing to code space which gdb does (TODO
 maybe gdb can then set breakpoints and inspect user variables?). There is no need for gdb to load the user code itself, just the
 user code symbols which is possible to do.
 
-So far, I've use the openocd telnet debugger to examine registers and memory when debugging user code via Jtag and leave gdb in kernel space.
+I use the openocd telnet debugger (on port 4444) to examine registers and memory when debugging user code via Jtag and leave gdb in kernel space.
 
 So the standard debug routine is as follows:
 
@@ -153,40 +153,45 @@ Run putty, serial, on ttyusb1 at 115200 for a terminal (same as terminal debug f
 
 - power board to boot unmatched to its uboot prompt (press a key to stop it launching Linux)
 - launch openocd (which halts uboot)
-
+```
 $ openocd -f openocd-jlink.cfg
-
+```
 - launch telnet 
-
+```
 $ telnet localhost 4444 to estabilsh a debug window for user code
-
+```
 - launch gdb 
-
+```
 $ riscv64-unknown-linux-gnu-gdb kernel
 
 (gdb) target extended-remote :3333 
-
+```
 Critical: choose the active thread. This is the one that opensbi was running uboot on and is random. I use the gdb command:
-
+```
 (gdb) info threads
-
+```
 to tell which thread was running uboot. Its the only thread with address 0xfffxxxxx. The others are still in opensbi at 0x8000xxxx.
-
-(gdb) thread X
-
-where X is the numeric thread identified above. Critically, this thread will have a valid 'tp' that identifies the running HART.
+```
+(gdb) thread N
+```
+where N is the numeric thread identified above. Critically, this thread will have a valid 'tp' that identifies the running HART.
 
 Its a pain to identify the running HART at xv6 launch so this code continues to rely on that to be true. Uboot does this by
 default when running from its command prompt so it should be possible to boot xv6 binary without a debugger. But if necessary,
 the xv6 initialization *can* tell the running hart by querying sbi for which HARTs are busy and only one should be busy at init
 time. I may add this later to be independent of this requirement.
+```
+(gdb) load
+```
+This actually loads the kernel elf into memory, initializing all of the segments (no bss zero initialization which xv6 seems
+to depend on, so I added a bss clear at init time).
 
 Then
-
+```
 (gdb) cont
-
-And xv6 should appear on the terminal
-
+```
+And xv6 should appear on the terminal:
+```
 xv6 kernel is booting  
   
 hart 2 starting  
@@ -194,20 +199,33 @@ hart 4 starting
 hart 1 starting  
 init: starting sh  
 $  
-
+```
 ## OpenOCD debugging
 
 The telnet window can be used to set hardware breakpoints, examine registers and memory via its commands. I use:
-
-- targets (N)  
+```
+targets N  
+```
 command to switch threads. Note that numbering is 0 based in Openocd wheras it is 1 based in gdb.
-- reg (reg name) 
+```
+reg (reg name) 
+```
 command to examine and change registers (e.g. reg sepc, reg satp)
-- mdh, mdd, mdb  
-commands to dump memory (32 bit, 64 bit, 8 bit)
-- resume  
+```
+mdh, mdd, mdb  
+```
+commands to dump memory (32 bit, 64 bit, 8 bit), e.g. 
+```
+mdh 0x80400000 16 
+```
+dumps the 1st 16 32-bit words of the kernel code )depending on page tables).
+```
+resume  
+```
 command to continue processing. Note that I prefer using gdb's 'cont' command so that it stays in sync with the code better
-- bp 0x(address) N hw  
+```
+bp 0x(address) N hw  
+```
 command sets a hardware breakpoint at address range address..address+N (I think). I usually set N to the
 byte size of the instruction that I want to break on
 
@@ -228,15 +246,26 @@ this wil likely fry the unmatched Jtag mux (or worse). This is unfortunate becau
 reasonably priced.
 
 ## GDB debugging
-
-- info threads  
+```
+info threads  
+```
 is needed to determine the state of the harts. Note that thread 1 is hart 0, 2 is hart 1 etc.
-- thread N  
- is needed to switch thread context
-- break label  
+```
+thread N  
+```
+is needed to switch thread context
+```
+break label  
+```
 is used to set a break at a label, e.g. break main
-- p /x variable  
+```
+p /x variable  
+```
 This one is really useful in user trap.c to print *p and *p->trapframe to examine the process state and user state at the trap.
+
+# Changing the user programs
+
+Please refer to the README in mk-ramdisk for information on how to update the ram_disk.h file which contains all of the user programs as a memory image.
 
 # Non XV6 stuff
 
@@ -244,16 +273,16 @@ This one is really useful in user trap.c to print *p and *p->trapframe to examin
 
 help is your friend - it shows all the available commands. In the quick start section, I used a couple of them and, in 
 addition to getting a full list of commands you can ask for help on any of them individually. For example:
-
+```
 => help fatls  
 fatls - list files in a directory (default /)  
 
 Usage:  
 fatls <interface> [<dev[:part]>] [directory]  
     - list files from 'dev' on 'interface' in a 'directory'  
-
+```
 So to check that you have the right parameters for load, you can do a fatls first:  
-
+```
 => fatls mmc 0:3  
    247608   config-6.10.6-riscv64  
             extlinux/  
@@ -266,7 +295,7 @@ So to check that you have the right parameters for load, you can do a fatls firs
    303632   kernel.bin  
 
 7 file(s), 2 dir(s)  
-
+```
 Here, you can see a (random) kernel.bin that I had on the root partition of a bootable SD card. I also had the kernel
 elf file but the bin file works fine here (no advantage for debug symbols without the Jtag debugger).
 
@@ -279,21 +308,27 @@ When I run Linux, I use the network interface to either ssh in or run X2Go serve
 X2Go client gives me a full X11 graphics interface and its reasonably fast.
 
 I've installed Uboot SPL and UBoot to the onboard SPI Flash. So no need for the SD card to get into Linux unless SPI gets corrupted. These have remained untouched through all of my Xv6 debug sessions by virtue of using the provided SBI facilities
-and Uboot to either launch XV6 or its (supervisor) Jtag environment to load into and run from there. Xv6 is not transitioning
-from machine mode to supervisor mode and there are 'enough privs' enabled by uboot to do anything we need memory, interrupt
-or IO wise. My thinking here is that if Linux runs, so can we!
+and Uboot to either launch XV6 or its (supervisor) Jtag environment to load into and run from there. 
+
+Starting from uboot which is already in supervisor mode, Xv6 doesnt need code to transition
+from machine mode to supervisor mode. There are 'enough privs' enabled by uboot to do anything we need memory, interrupt
+or IO wise. 
+
+My thinking here is that if Linux can run following uboot, so can we!
 
 
-## My Debian Linux setup on Unmatched
+## Debian Linux setup on Unmatched
 
-When not running xv6, I'm running Debian Linux installed on a NVMe SSD. I'll try to follow up with info on how all of that got
-set up in case its relevent or useful but I believe this code will run fine when loaded from the uboot prompt of the SD Card.
+When not running xv6, I'm running Debian Linux installed on a NVMe SSD. 
+
+If there is interest, I'll try to follow up with info on how all of that got
+set up.
 
 What I can say is that it was surprisingly easy to get Debian (SID) running with its vast prebuilt packages available. The
 only downside presently is that since RISCV is only supported with their SID (experimental) release its hard to reference
 a particular stable release in case the latest has some problem.
 
-## Jtag curiosities with Linux (not XV6 related)
+## Jtag curiosities with Linux
 
 Its cool to start Jtag while running Linux. I can easily see whats happening under the hood. For example, Hart 0 is happily
 still running in OpenSBI (at a wfi instruction) and the 4 other harts are doing all kinds of stuff with their own page tables. Debugging Linux

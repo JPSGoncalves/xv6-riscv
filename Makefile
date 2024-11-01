@@ -1,12 +1,20 @@
+runtime_config := sbi
+#runtime_config := machine
+
 K=kernel
 U=user
 
-OBJS = \
-  $K/entry.o \
+OBJS =
+ifeq ($(runtime_config), sbi)
+OBJS += $K/entry_sbi.o
+else
+OBJS += $K/entry.o
+endif
+
+OBJS += \
   $K/start.o \
   $K/console.o \
   $K/printf.o \
-  $K/uart.o \
   $K/kalloc.o \
   $K/spinlock.o \
   $K/string.o \
@@ -27,8 +35,17 @@ OBJS = \
   $K/exec.o \
   $K/sysfile.o \
   $K/kernelvec.o \
+
+ifeq ($(runtime_config), sbi)
+OBJS += \
+   $K/sbi.o \
+   $K/ram_disk.o
+else
+OBJS += \
   $K/plic.o \
-  $K/virtio_disk.o
+  $K/virtio_disk.o \
+  $K/uart.o
+endif
 
 # riscv64-unknown-elf- or riscv64-linux-gnu-
 # perhaps in /opt/riscv/bin
@@ -70,6 +87,9 @@ CFLAGS += -fno-builtin-printf -fno-builtin-fprintf -fno-builtin-vprintf
 CFLAGS += -I.
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 
+ifeq ($(runtime_config), sbi)
+CFLAGS += -DRUNTIME_SBI
+endif
 # Disable PIE when possible (for Ubuntu 16.10 toolchain)
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
 CFLAGS += -fno-pie -no-pie
@@ -80,10 +100,16 @@ endif
 
 LDFLAGS = -z max-page-size=4096
 
-$K/kernel: $(OBJS) $K/kernel.ld $U/initcode
-	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS) 
+ifeq ($(runtime_config), sbi)
+linker_ld = $K/kernel_sbi.ld
+else
+linker_ld = $K/kernel.ld
+endif
+$K/kernel: $(OBJS) $(linker_ld) $U/initcode
+	$(LD) $(LDFLAGS) -T $(linker_ld) -o $K/kernel $(OBJS) 
 	$(OBJDUMP) -S $K/kernel > $K/kernel.asm
 	$(OBJDUMP) -t $K/kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $K/kernel.sym
+	$(OBJCOPY) -O binary $K/kernel $K/kernel.bin
 
 $U/initcode: $U/initcode.S
 	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $U/initcode.S -o $U/initcode.o
@@ -138,7 +164,9 @@ UPROGS=\
 	$U/_usertests\
 	$U/_grind\
 	$U/_wc\
-	$U/_zombie\
+	$U/_zombie
+
+userprogs: $(UPROGS) fs.img
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

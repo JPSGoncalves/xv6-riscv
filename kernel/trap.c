@@ -163,7 +163,13 @@ kerneltrap()
 void
 clockintr()
 {
+#ifdef RUNTIME_SBI
+  // boot hart is not fixed at 0
+  struct cpu* c = mycpu();
+  if (c->isboothart){
+#else
   if(cpuid() == 0){
+#endif
     acquire(&tickslock);
     ticks++;
     wakeup(&ticks);
@@ -171,9 +177,18 @@ clockintr()
   }
 
   // ask for the next timer interrupt. this also clears
-  // the interrupt request. 1000000 is about a tenth
-  // of a second.
+  // the interrupt request. The event is timed for about
+  // a tenth of a second.
+#ifdef RUNTIME_SBI
+  sbi_set_timer(r_time() + TIMERINTCNT);
+  // temporary polling in timer interrupt
+  int ch = sbi_console_getchar();
+  if (ch > 0) {
+    consoleintr(ch);
+  }
+#else
   w_stimecmp(r_time() + 1000000);
+#endif
 }
 
 // check if it's an external interrupt or software interrupt,
@@ -188,10 +203,14 @@ devintr()
 
   if(scause == 0x8000000000000009L){
     // this is a supervisor external interrupt, via PLIC.
-
+#ifdef RUNTIME_SBI
+   // For now, his config avoids interrupts for console and uses a ram disk
+   // so this is unexpected and not sure how to service the condition..
+   panic("unexpected device/external interrupt\n");
+#else
     // irq indicates which device interrupted.
     int irq = plic_claim();
-
+	
     if(irq == UART0_IRQ){
       uartintr();
     } else if(irq == VIRTIO0_IRQ){
@@ -205,7 +224,7 @@ devintr()
     // now allowed to interrupt again.
     if(irq)
       plic_complete(irq);
-
+#endif
     return 1;
   } else if(scause == 0x8000000000000005L){
     // timer interrupt.
