@@ -2,6 +2,9 @@
 
 This branch captures changes made to support a sifive-unmatched board running opensbi (its default configuration).
 
+The code also appears to run unmodified on StarFive Vision 5 2 (v1.30 board). See additional notes on that in
+README-opensbi-vision5-2.md.
+
 The default xv6 release supports machine mode (only) so this would not run on unmatched without replacing its Uboot-SPL
 
 While that may be a useful exercise, this approach allows a user to run/debug a stock/unmodified unmatched board
