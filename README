@@ -1,4 +1,5 @@
 Please review README-opensbi-unmatched file for changes specific to this branch
+Update: See also the README-opensbi-vision5-2 file that describes how the same binary runs on the VF2 platform.
 ==
 
 xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
