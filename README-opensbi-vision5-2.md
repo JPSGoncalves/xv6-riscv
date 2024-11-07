@@ -7,6 +7,45 @@ The exact same binary as released for the unmatched appears to run on this board
 - To date, I've only tried loading the code with Jtag. But I have no reason to believe that the uboot binary load/run will not work. Issue is my VF2 board is not as well controlled as the version on the unmatched board.
 - I'm using a different Jtag adapter for the VF2 board since I didnt want to move the Jlink EDU (old version) off of the unmatched yet. I'm specifically using an FTDI FT2232H-56Q minimodule. I'll include a working Jtag config that I'm using in the Jtag directory.
 
+## Errata (hopefully temporary)
+
+While trying to verify that the binary (non-Jtag) xv6 kernel.bin file runs, I managed to boot my SD card into Linux, transfer the kernel.bin file to the
+SD card and attempt to boot it from next uboot startup.
+
+While it boots, there is something wrong with the keyboard input -- I get an SBI error with each keypress:
+
+```
+$ sbi_ecall_handler: Invalid error 13 for ext=0x2 func=0x0
+sbi_ecall_handler: Invalid error 13 for ext=0x2 func=0x0
+```
+
+I've since traced the source of this error to some difference in boot code on the SD card versus what I was previously running from SPI (boot mode 00, or "Flash" on the PCB). 
+
+Its odd because both versions report the same SPL/SBI version, but the one that works is the older one:
+
+This one works fine:
+```
+U-Boot SPL 2021.10 (Feb 12 2023 - 18:15:33 +0800)
+```
+
+Versus the newer version:
+This one reports the aforementioned error.
+
+```
+U-Boot SPL 2021.10 (Sep 19 2024 - 15:43:53 +0800)
+```
+
+I'll try to figure out what is different. Also, the interrupt rate is faster, so in test code I changed TIMERINTCNT to 400000 (not checked in) to reduce the interrupt rate to approximately 10x per second.
+
+Finally, the VF2 board has a different DDR memory map from siFive unmatched board but its kernel.bin load address (0x80400000) is still within valid space with plenty of headroom. The code really should be recompiled for something around 0x40xxxxxx where xxxxxx leaves room for SBI that loads at 0x40000000.
+
+I dont know why, but it took a long time to find the memory map published, it was in the JH7110 "Technical Reference Manual" 
+
+```
+https://doc-en.rvspace.org/JH7110/TRM/JH7110_TRM/system_memory_map.html
+```
+
+
 ## FT2232H-56Q minimodule Jtag wiring details
 
 ```
