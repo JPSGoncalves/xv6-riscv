@@ -18,8 +18,9 @@
 // PHYSTOP -- end RAM used by the kernel
 
 // qemu puts UART registers here in physical memory.
+#include "param.h"
 
-#ifdef RUNTIME_SBI
+#ifdef BOARD_UNMATCHED
 #define UART0 0x10010000L
 #define UART0_IRQ 32
 #else

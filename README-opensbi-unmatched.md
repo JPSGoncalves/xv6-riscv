@@ -2,25 +2,34 @@
 
 This branch captures changes made to support a sifive-unmatched board running opensbi (its default configuration).
 
-The code also appears to run unmodified on StarFive Vision 5 2 (v1.30 board). See additional notes on that in
-README-opensbi-vision5-2.md.
+The code can run on StarFive VisionFive 2 (v1.30 board). See additional notes on that in README-opensbi-vision5-2.md and select the desired configuration option in param.h as further described below.
 
 The default xv6 release supports machine mode (only) so this would not run on unmatched without replacing its Uboot-SPL
 
-While that may be a useful exercise, this approach allows a user to run/debug a stock/unmodified unmatched board
-or (hopefully) any board that runs uboot (with sbi). 
+While that may be a useful exercise, this approach allows a user to run xv6 using the platform distributed uboot without change. 
 
 The other problem with messing with the SPL is it contains all the board (e.g. DDR ram) initialization code. So, effectively,
-what we are doing here is interrupting Linux boot by pressing a key while it is in uboot and loading this image
-instead of Linux. Either run in RISCV supervisor mode and make use of the memory resident sbi that uboot and Linux uses.
+what we are doing here is interrupting Linux boot by pressing a key while it is in uboot and loading this image instead of Linux. 
 
-The modifications are fairly minor with a define selection in Makefile and a corresponding one in param.h. 
+Both xv6 and Linux run in supervisor mode and have no direct access to RISCV machine mode.
 
-- RUNTIME_SBI -- enables branch specific changes relating to OpenSBI  
+The modifications (from distribution xv6) are fairly minor with a define selection in Makefile and a corresponding one in param.h: 
+```
+RUNTIME_SBI -- enables branch specific changes relating to the OpenSBI port
+```
 
 # Quick Start
 
-Interrupt the Unmatched boot process by pressing a key on the USB UART debug terminal while it is in Uboot. This starts
+Prior to make, in param.h, select BOARD_UNMATCHED and deselect BOARD_VF2 for the Unmatched version.
+```
+#define BOARD_UNMATCHED
+//#define BOARD_VF2
+```
+In param.h, optionally select POLL_UART0_DIRECT to poll UART0 for console receive characters within xv6 (rather than use SBI for console polling). Either option works on the Unmatched board but it does make a difference on the VF2 board depending on its SBI version.
+
+For convenience, the v0.2 release contains both "pure SBI" and "Uart0 direct" binaries (and elf files in case using Jtag). See the README file in the release for additional comments.
+
+To run, interrupt the Unmatched boot process by pressing a key on the USB UART debug terminal while it is in Uboot. This starts
 the uboot command interface where it is possible to load and run a binary file (the xv6 kernel binary given as a release or
 produced via recompile of the source code).
 
@@ -99,7 +108,7 @@ done in this version.
 
 Here I list stuff that I have not yet resolved
 
-## An oddity with SMP
+## A possible oddity with SMP
 
 This version launches all 4 U74 cores (Harts) and they seem functional. But I'm not yet sure if there is a problem. I would have expected
 the cores to be at a "wfi" instruction awaiting an interrupt (keypress or timer) when idle. I believe the initial core
@@ -115,6 +124,7 @@ are cleverly written with expected results (including for faults).
 
 I've met my match with the failure of one particular test on unmatched: sbrkmuch() within usertests.c. This test runs fine:
 
+- on the VF2 board
 - occasionally (unmodified). Run the test a few times in a row from the command prompt.
 - when run standalone (via command line parameter to just run sbrkmuch).
 - when its moved or called differently from its original version.

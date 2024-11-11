@@ -1,16 +1,23 @@
 # Notes about this branch and StarFive Vision 5 (2) or VF2 board
 
-The exact same binary as released for the unmatched appears to run on this board. Very little testing has been done so far but I wanted to note the following:
+Prior to make, in param.h, select BOARD_VF2 and deselect BOARD_UNMATCHED for the VF2 version.
+```
+//#define BOARD_UNMATCHED
+#define BOARD_VF2
+```
+In param.h, also select POLL_UART0_DIRECT to poll UART0 for console receive characters within xv6 (rather than use SBI for console polling). 
 
-- The usertests issues described in the unmatched README either do not happen or happen with less frequency. In other words, the problem with sbrkmuch() has not yet been observed.
-- Its possible/likely that the interrupt rate is different on this board and therefore an adjustment is needed to 'TIMERINTCNT' in param.h.
-- To date, I've only tried loading the code with Jtag. But I have no reason to believe that the uboot binary load/run will not work. Issue is my VF2 board is not as well controlled as the version on the unmatched board.
+Early versions of VF2 firmware supported pure SBI but this option sidesteps the issue by talking directly to the UART for console receive characters.
+
+For convenience, the v0.2 release contains both "pure SBI" and "Uart0 direct" binaries (and elf files in case using Jtag). See the README file in the release for additional comments.
+
+- The usertests issues described in the unmatched README do not happen on VF2 board.
+- Selecting BOARD_VF2 adjusts the timer interrupt rate to compensate for observed higher timer clock frequency.
 - I'm using a different Jtag adapter for the VF2 board since I didnt want to move the Jlink EDU (old version) off of the unmatched yet. I'm specifically using an FTDI FT2232H-56Q minimodule. I'll include a working Jtag config that I'm using in the Jtag directory.
 
-## Errata (hopefully temporary)
+## Errata
 
-While trying to verify that the binary (non-Jtag) xv6 kernel.bin file runs, I managed to boot my SD card into Linux, transfer the kernel.bin file to the
-SD card and attempt to boot it from next uboot startup.
+As described above, the 'pure sbi' VF2 configuration does not process console keyboard input correctly with recent board firmare.
 
 While it boots, there is something wrong with the keyboard input -- I get an SBI error with each keypress:
 
@@ -28,18 +35,15 @@ This one works fine:
 U-Boot SPL 2021.10 (Feb 12 2023 - 18:15:33 +0800)
 ```
 
-Versus the newer version:
-This one reports the aforementioned error.
+The newer version reports the aforementioned error.
 
 ```
 U-Boot SPL 2021.10 (Sep 19 2024 - 15:43:53 +0800)
 ```
 
-I'll try to figure out what is different. Also, the interrupt rate is faster, so in test code I changed TIMERINTCNT to 400000 (not checked in) to reduce the interrupt rate to approximately 10x per second.
+The VF2 board has a different DDR memory map from siFive unmatched board but its kernel.bin load address (0x80400000) is still within valid space with plenty of headroom. The code really should be recompiled for something around 0x40xxxxxx where xxxxxx leaves room for SBI that loads at 0x40000000.
 
-Finally, the VF2 board has a different DDR memory map from siFive unmatched board but its kernel.bin load address (0x80400000) is still within valid space with plenty of headroom. The code really should be recompiled for something around 0x40xxxxxx where xxxxxx leaves room for SBI that loads at 0x40000000.
-
-I dont know why, but it took a long time to find the memory map published, it was in the JH7110 "Technical Reference Manual" 
+I dont know why, but it took a long time to locate the VF2 memory map. It is in the JH7110 "Technical Reference Manual" 
 
 ```
 https://doc-en.rvspace.org/JH7110/TRM/JH7110_TRM/system_memory_map.html

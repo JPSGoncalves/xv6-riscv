@@ -181,11 +181,9 @@ clockintr()
   // a tenth of a second.
 #ifdef RUNTIME_SBI
   sbi_set_timer(r_time() + TIMERINTCNT);
-  // temporary polling in timer interrupt
-  int ch = sbi_console_getchar();
-  if (ch > 0) {
-    consoleintr(ch);
-  }
+  // Until we integrate a proper UART driver, temporarily poll the UART in timer interrupt
+  // This is because the only interrupt enabled is the timer interrupt
+  sbi_poll_uart0();
 #else
   w_stimecmp(r_time() + 1000000);
 #endif

@@ -39,7 +39,8 @@ OBJS += \
 ifeq ($(runtime_config), sbi)
 OBJS += \
    $K/sbi.o \
-   $K/ram_disk.o
+   $K/ram_disk.o \
+   $K/sbi_uart.o
 else
 OBJS += \
   $K/plic.o \
@@ -177,7 +178,7 @@ fs.img: mkfs/mkfs README $(UPROGS)
 clean: 
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
 	*/*.o */*.d */*.asm */*.sym \
-	$U/initcode $U/initcode.out $K/kernel fs.img \
+	$U/initcode $U/initcode.out $K/kernel $K/kernel.bin fs.img \
 	mkfs/mkfs .gdbinit \
         $U/usys.S \
 	$(UPROGS)

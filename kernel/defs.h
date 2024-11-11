@@ -189,6 +189,9 @@ void            virtio_disk_intr(void);
 void            ram_disk_init(void);
 void            ram_disk_rw(struct buf*, int write);
 
+// sbi_uart.c
+void            sbi_poll_uart0(void);
+
 // start.c
 void timerinit(void);
 

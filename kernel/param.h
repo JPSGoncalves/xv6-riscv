@@ -22,7 +22,26 @@
 #define MAXPATH      128   // maximum file path name
 #define USERSTACK    1     // user stack pages
 #define BSIZE        1024  // block size
+
+// SBI default uses API for console input. However
+// POLL_UART0_DIRECT is needed on VF2 board due to SBI bug (polls Uart register directly)
+// The scheme also works on UNMATCHED board, but select proper BOARD to remap hardware
+
+#define POLL_UART0_DIRECT
+
+// Choose either BOARD_VF2 or BOARD_UNMATCHED but not both else #error
+//#define BOARD_UNMATCHED
+#define BOARD_VF2
+
+// The following enforces either-or seletion of board (else redefined error)
+#ifdef BOARD_VF2
+#define TIMERINTCNT  400000 // counter increment until next interrupt -- JH7110
+#endif
+
+#ifdef BOARD_UNMATCHED
 #define TIMERINTCNT  100000 // counter increment until next interrupt
+#endif
+
 #else
 #define NPROC        64  // maximum number of processes
 #define NCPU          8  // maximum number of CPUs
