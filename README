@@ -1,5 +1,10 @@
-Please review README-opensbi-unmatched file for changes specific to this branch
-Update: See also the README-opensbi-vision5-2 file that describes how the same binary runs on the VF2 platform.
+
+# Note
+
+Please review README-opensbi-overview file for an overview of xv6 hardware porting changes specific to this branch.
+See also the README-opensbi-boardXXX files that describe specifics associated with each supported board
+(Sifive Unmatched, Vision five 2, Banana Pi F3).
+
 ==
 
 xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
