@@ -1,7 +1,10 @@
+#include "param.h"
+
         # qemu -kernel loads the kernel at 0x80000000
         # and causes each hart (i.e. CPU) to jump there.
         # kernel.ld causes the following code to
-        # be placed at 0x80000000.
+        # be placed at 0x80000000.        
+
 .section .text
 
 .global _entry
@@ -9,24 +12,31 @@
 .globl _entry_hart2
 .globl _entry_hart3
 .globl _entry_hart4
+#if defined(BOARD_BPIF3)
+.globl _entry_hart5
+.globl _entry_hart6
+.globl _entry_hart7
+.globl _entry_hart8
+#endif
 .globl _entry_mistake
 .extern __bss_start
 .extern __bss_end
 
 _entry:
-        // uboot identifies the "chosen" hart in tp
-        // not sure if thats a spec though. hart0 stays dormant in opensbi
-        // (we can change that if we want as long as we have something
-        //  productive to do outside of xv6, e.g. expand _entry_mistake.
-        //  I'm thinking of some kind of raw memory peeker runing its own debugger.
-        // this is because it does not have supervisor support
-        // Only the 1st hart can clear bss
-        // ideally this would happen on initial code load but it doesnt
+        # for openboot initiated launch, tp has the hart id in tp already
+        # and in the general case can be any hart
+        # 0 is reserved for siFive RT cores (unmatched, VF2) and will not enter here in tp
+#if defined(BOARD_BPIF3)
+        # processor 0 is usable on BPIF3 board (spacemit k1) and code expects tp from 1..NCPU for stack
+        # we observe processor 0 always selected for this board but presumably can range from 0-7
+        addi tp, tp, 1
+#endif
         call clear_bss
         j entry_run
-        // opensbi initiated harts do not self identify hart id so when we
-        // start them in main() we direct their start address appropriately
-        // logic there prevents a request to send in the same hart as uboot did
+        # xv6/opensbi initiated harts do not self identify hart id so when we
+        # start them in main() we direct their start address appropriately
+        # logic there prevents a request to send in the same hart as uboot did
+        # and already range from 1..max
 _entry_hart1:
         li tp,1
         j entry_run
@@ -38,7 +48,23 @@ _entry_hart3:
         j entry_run
 _entry_hart4:
         li tp,4
+#if defined(BOARD_BPIF3)
+        # BPI F3 has spacemit chip with 8 usable cores
+        j entry_run
+_entry_hart5:
+        li tp,5
+        j entry_run
+_entry_hart6:
+        li tp,6
+        j entry_run
+_entry_hart7:
+        li tp,7
+        j entry_run
+_entry_hart8:
+        li tp,8
+#endif
 entry_run:
+
         # set up a stack for C.
         # stack0 is declared in start.c,
         # with a 4096-byte stack per CPU.
@@ -46,10 +72,7 @@ entry_run:
         la sp, stack0
         li a0, 1024*4
         # csrr a1, mhartid
-        # for unmatched openboot launch, tp has the hart id in tp already
-        # but its range is 1-4 not 0-4. 0 is left in reserve since its an S7 core
         mv a1,tp
-        # in effect, a1 has already been incremented by 1 due to range 1-4
         # addi a1, a1, 1
         mul a0, a0, a1
         add sp, sp, a0
@@ -75,12 +98,22 @@ clear_bss:
 done:
         ret
 
-# assumes NPROC = 5 (0 is not used on unreached but we reserve space anyway)
+# the "calling" hart will be stopped and held in stop state within sbi
+# this function does not return -- need to call sbi_hart_start(hard id)
+park:
+        li a6, 1
+        lui a7, 0x485
+        add a7, a7, 0x34d   # 48534d
+        ecall
+        # should not get here..
+        j spin
+
+
 .section .bss.stack
 .align 12
 .globl stack0
 stack0:
-    .space 4096 * 4 * 5
+    .space 4096 * 4 * (NCPU+1)
     .globl stack0_top
 stack0_top:
 

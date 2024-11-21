@@ -21,7 +21,8 @@ start()
   // skip all the machine mode initialization
   
   // dont need SEIE until we fool with the UART
-  w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
+  //w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
+  w_sie(r_sie() | SIE_STIE | SIE_SSIE);
   // ask for clock interrupts.
   timerinit();
 #else

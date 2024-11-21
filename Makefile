@@ -1,5 +1,17 @@
+
+# make Makefile a dependency in case editing board_config etc 
+.EXTRA_PREREQS:= $(abspath $(lastword $(MAKEFILE_LIST)))
+
 runtime_config := sbi
 #runtime_config := machine
+
+#
+# select one of the following boards for sbi config
+#
+
+#board_config := unmatched
+#board_config := vf2
+board_config := bpif3
 
 K=kernel
 U=user
@@ -90,6 +102,15 @@ CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 &
 
 ifeq ($(runtime_config), sbi)
 CFLAGS += -DRUNTIME_SBI
+ifeq ($(board_config), unmatched)
+CFLAGS += -DBOARD_UNMATCHED
+endif
+ifeq ($(board_config), vf2)
+CFLAGS += -DBOARD_VF2
+endif
+ifeq ($(board_config), bpif3)
+CFLAGS += -DBOARD_BPIF3
+endif
 endif
 # Disable PIE when possible (for Ubuntu 16.10 toolchain)
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
@@ -102,7 +123,13 @@ endif
 LDFLAGS = -z max-page-size=4096
 
 ifeq ($(runtime_config), sbi)
+# bpif3 does not have ddr at the same range as unmatched and vf2
+ifeq ($(board_config), bpif3)
+linker_ld = $K/kernel_bf3.ld
+else
+# for now, unmatched and vf2 share a linker ld file but should revisit
 linker_ld = $K/kernel_sbi.ld
+endif
 else
 linker_ld = $K/kernel.ld
 endif
@@ -128,6 +155,11 @@ _%: %.o $(ULIB)
 	$(OBJDUMP) -S $@ > $*.asm
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
 
+# need to handle #include in entry_sbi.S file so make gcc rule to include param.h
+# the standard assembly file compilation does not track include files
+$K/entry_sbi.o: $K/entry_sbi.S $K/param.h
+	$(CC) $(CFLAGS) -c -o $K/entry_sbi.o $K/entry_sbi.S
+
 $U/usys.S : $U/usys.pl
 	perl $U/usys.pl > $U/usys.S
 
@@ -140,8 +172,13 @@ $U/_forktest: $U/forktest.o $(ULIB)
 	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_forktest $U/forktest.o $U/ulib.o $U/usys.o
 	$(OBJDUMP) -S $U/_forktest > $U/forktest.asm
 
+GCCFLAGS = -Werror -Wall
+ifeq ($(runtime_config), sbi)
+GCCFLAGS += -DRUNTIME_SBI
+endif
+
 mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
-	gcc -Werror -Wall -I. -o mkfs/mkfs mkfs/mkfs.c
+	gcc $(GCCFLAGS) -I. -o mkfs/mkfs mkfs/mkfs.c
 
 # Prevent deletion of intermediate files, e.g. cat.o, after first build, so
 # that disk image changes after first build are persistent until clean.  More

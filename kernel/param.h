@@ -1,14 +1,25 @@
 #ifndef __PARAM_H
 #define __PARAM_H
 
-#ifndef RUNTIME_SBI
+// This selection moved to Makefile but leaving here when helpful for MS Code editing
+//#ifndef BOARD_UNMATCHED
+//#define BOARD_UNMATCHED
+//#endif
+//#define BOARD_VF2
+//#define BOARD_BPIF3
+
+//#ifndef RUNTIME_SBI
 // RUNTIME_SBI may be defined in the Makefile so protect from redefinition
-#define RUNTIME_SBI
-#endif
+//#define RUNTIME_SBI
+//#endif
 
 #ifdef RUNTIME_SBI
 #define NPROC        50  // maximum number of processes
-#define NCPU          5  // maximum number of CPUs (0 is not used but need to account for it)
+#ifdef BOARD_BPIF3
+#define NCPU          8  // maximum number of CPUs
+#else
+#define NCPU          4  // maximum number of CPUs
+#endif
 #define NOFILE       16  // open files per process
 #define NFILE       100  // open files per system
 #define NINODE       50  // maximum number of active i-nodes
@@ -23,15 +34,19 @@
 #define USERSTACK    1     // user stack pages
 #define BSIZE        1024  // block size
 
-// SBI default uses API for console input. However
-// POLL_UART0_DIRECT is needed on VF2 board due to SBI bug (polls Uart register directly)
-// The scheme also works on UNMATCHED board, but select proper BOARD to remap hardware
+// POLL_UART0_DIRECT selection
+//
+// Board        |   POLL_UART_DIRECT   |   Comment
+// -----------------------------------------------------------------------------------------------------
+// Unmatched    |   defined            |  Use Uart access for console Rx
+// Unmatched    |   not defined        |  Use SBI API for console Rx
+// VF2          |   defined            |  Use Uart access for console Rx
+// VF2          |   not defined        |  Use SBI API for console Rx. But
+//              |                      |  does not work reliably (depends on Starfive firmware version)
+// Banana-pi F3 |   defined            |  Not yet supported
+// Banana-pi F3 |   not defined        |  Use SBI API for console Rx
 
-#define POLL_UART0_DIRECT
-
-// Choose either BOARD_VF2 or BOARD_UNMATCHED but not both else #error
-//#define BOARD_UNMATCHED
-#define BOARD_VF2
+//#define POLL_UART0_DIRECT
 
 // The following enforces either-or seletion of board (else redefined error)
 #ifdef BOARD_VF2
@@ -40,6 +55,10 @@
 
 #ifdef BOARD_UNMATCHED
 #define TIMERINTCNT  100000 // counter increment until next interrupt
+#endif
+
+#ifdef BOARD_BPIF3
+#define TIMERINTCNT  2400000 // counter increment until next interrupt
 #endif
 
 #else

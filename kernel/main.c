@@ -11,8 +11,14 @@ extern void *_entry_hart1;
 extern void *_entry_hart2;
 extern void *_entry_hart3;
 extern void *_entry_hart4;
+#ifdef BOARD_BPIF3
+extern void *_entry_hart5;
+extern void *_entry_hart6;
+extern void *_entry_hart7;
+extern void *_entry_hart8;
+#endif
 extern void *_entry_mistake;
-unsigned long harts_entry[NCPU];
+unsigned long harts_entry[NCPU+1];
 #else
 volatile static int started = 0;
 #endif
@@ -26,16 +32,25 @@ main()
     if (started < 0)
     {
       // Only the uboot specified random (!) hart runs this code, so save its id
-      // so we know which other cores to start for SMP. Range is 1-4 (not 0)
+      // so we know which other cores to start for SMP. Range is always 1..NCPU (0 may be RT hart)
       boothartid = r_tp();
       // uboot identified its chosen hart in tp for us
-      // But we need to uniquely init tp when starting harts via opensbi
-      // no need to set up this array again after init
+      // But we need to uniquely init tp when starting other harts once started
+      // on unmatched and vf2, hart 0 is the realtime processor and not used
+      // BPIF3 (spacemit) has harts 0-7 but we incremented tp by one in entry_sbi to be compatible here
       harts_entry[0] = (unsigned long) &_entry_mistake;
+      // hart 1-4 are RV64G+ processors on all 3 boards
       harts_entry[1] = (unsigned long) &_entry_hart1;
       harts_entry[2] = (unsigned long) &_entry_hart2;
       harts_entry[3] = (unsigned long) &_entry_hart3;
       harts_entry[4] = (unsigned long) &_entry_hart4;
+#ifdef BOARD_BPIF3
+      // hart 5-8 are only vailable on BPIF3 (spacemit)
+      harts_entry[5] = (unsigned long) &_entry_hart5;
+      harts_entry[6] = (unsigned long) &_entry_hart6;
+      harts_entry[7] = (unsigned long) &_entry_hart7;
+      harts_entry[8] = (unsigned long) &_entry_hart8;
+#endif
 #else
   if(cpuid() == 0){
 #endif
@@ -62,20 +77,25 @@ main()
 #endif
     userinit();      // first user process
     __sync_synchronize();
+    // newly started harts must not come down same path as boot hart
     started = 1;
 #ifdef RUNTIME_SBI
-      for (int i = 1; i < NCPU; i++)
+#ifdef BOARD_BPIF3
+    // cant start hart 1 for now since 0 was mapped to 1
+    for (int i = 2; i < NCPU; i++)
+#else
+    for (int i = 1; i <= NCPU; i++)
+#endif
+    {
+      if (i != boothartid)
       {
-        if (i != boothartid)
-        {
-          sbi_hart_start(i, harts_entry[i]);
-        }
+        sbi_hart_start(i, harts_entry[i]);
+
       }
+    }
 #endif
   } else {
 #ifdef RUNTIME_SBI
-   // This technically shouldnt happen because of where we set 'started'
-   // (other cores were penned back in opensbi before then)
    while (started < 0)
      ;
 #else

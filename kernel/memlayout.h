@@ -23,6 +23,9 @@
 #ifdef BOARD_UNMATCHED
 #define UART0 0x10010000L
 #define UART0_IRQ 32
+#elif defined(BOARD_BPIF3)
+#define UART0 0xD4017000L
+#define UART0_IRQ 42
 #else
 #define UART0 0x10000000L
 #define UART0_IRQ 10
@@ -46,7 +49,12 @@
 // for use by the kernel and user pages
 // from physical address 0x80000000 to PHYSTOP.
 #ifdef RUNTIME_SBI
+#if defined(BOARD_BPIF3)
+#define KERNBASE 0x10000000L
+#else
+// this works for Unmatched and VF2
 #define KERNBASE 0x80400000L
+#endif
 #else
 #define KERNBASE 0x80000000L
 #endif
