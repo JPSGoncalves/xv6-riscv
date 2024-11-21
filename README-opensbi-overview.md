@@ -83,23 +83,6 @@ If the sequence is successful, the startup should be similar to this:
 
 ```
 Hit any key to stop autoboot:  0
-=>
-=> fatls mmc 0:3
-   247608   config-6.10.6-riscv64
-            extlinux/
-    11115   hifive-unmatched-a00.dtb
- 38485527   initrd.img-6.10.6-riscv64
-            lost+found/
-       83   System.map-6.10.6-riscv64
- 26887168   vmlinux-6.10.6-riscv64
-     5920   try1
-       66   try1.bin
-   540720   kernel
-  2078760   kernel.bin
-  2078808   v0.2kernel.bin
-
-10 file(s), 2 dir(s)
-
 => fatload mmc 0:3 0x80400000 kernel.bin
 2078760 bytes read in 1836 ms (1.1 MiB/s)
 => go 0x80400000
@@ -223,7 +206,7 @@ $
 
 ## BPIF3
 
-VF2 debug UART access requires the addition of an inexpensive ftdi USB interface (e.g. Sparkfun ftdi basic) and connecting the TX, RX and gnd signals to the TX, RX and gnd labeled pins alongside the 26 pin header. Note that
+BPIF3 debug UART access requires the addition of an inexpensive ftdi USB interface (e.g. Sparkfun ftdi basic) and connecting the TX, RX and gnd signals to the TX, RX and gnd labeled pins alongside the 26 pin header. Note that
 the ftdi "TX" pin connects to the board "RX" pin, the ftdi "RX" pin connects to the board "TX" pin and gnd
 attaches to gnd. THis is because each device is labeling the pins as respect to itself. 
 
