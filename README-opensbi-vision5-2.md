@@ -1,54 +1,27 @@
-# Notes about this branch and StarFive Vision 5 (2) or VF2 board
+# Notes about this branch and StarFive Vision Five 2 (VF2) board
 
-Prior to make, in param.h, select BOARD_VF2 and deselect BOARD_UNMATCHED for the VF2 version.
-```
-//#define BOARD_UNMATCHED
-#define BOARD_VF2
-```
-In param.h, also select POLL_UART0_DIRECT to poll UART0 for console receive characters within xv6 (rather than use SBI for console polling). 
+Owing to StarFive use of SiFive U74 cores in the JH7110, the board shares many characteristics with the SiFive unmatched board.
 
-Early versions of VF2 firmware supported pure SBI but this option sidesteps the issue by talking directly to the UART for console receive characters.
+The main difference is the memory map and peripherals surrounding the core.
 
-For convenience, the v0.2 release contains both "pure SBI" and "Uart0 direct" binaries (and elf files in case using Jtag). See the README file in the release for additional comments.
+The xv6 software therefore only has minor differences from Unmatched:
 
-- The usertests issues described in the unmatched README do not happen on VF2 board.
-- Selecting BOARD_VF2 adjusts the timer interrupt rate to compensate for observed higher timer clock frequency.
-- I'm using a different Jtag adapter for the VF2 board since I didnt want to move the Jlink EDU (old version) off of the unmatched yet. I'm specifically using an FTDI FT2232H-56Q minimodule. I'll include a working Jtag config that I'm using in the Jtag directory.
+- The clock counter advances faster than unmatched (and is therefore compensated)
+- The UART is mapped at a different address and uses a different style interface
+- DDR, Uboot and OpenSBI exist at different addresses (from unmatched) but xv6 can run at the same 0x80400000 address since DDR
+exists there.
 
-## Errata
-
-As described above, the 'pure sbi' VF2 configuration does not process console keyboard input correctly with recent board firmare.
-
-While it boots, there is something wrong with the keyboard input -- I get an SBI error with each keypress:
-
-```
-$ sbi_ecall_handler: Invalid error 13 for ext=0x2 func=0x0
-sbi_ecall_handler: Invalid error 13 for ext=0x2 func=0x0
-```
-
-I've since traced the source of this error to some difference in boot code on the SD card versus what I was previously running from SPI (boot mode 00, or "Flash" on the PCB). 
-
-Its odd because both versions report the same SPL/SBI version, but the one that works is the older one:
-
-This one works fine:
-```
-U-Boot SPL 2021.10 (Feb 12 2023 - 18:15:33 +0800)
-```
-
-The newer version reports the aforementioned error.
-
-```
-U-Boot SPL 2021.10 (Sep 19 2024 - 15:43:53 +0800)
-```
-
-The VF2 board has a different DDR memory map from siFive unmatched board but its kernel.bin load address (0x80400000) is still within valid space with plenty of headroom. The code really should be recompiled for something around 0x40xxxxxx where xxxxxx leaves room for SBI that loads at 0x40000000.
-
-I dont know why, but it took a long time to locate the VF2 memory map. It is in the JH7110 "Technical Reference Manual" 
+For reference, the VF2 board memory map is described in the JH7110 "Technical Reference Manual" 
 
 ```
 https://doc-en.rvspace.org/JH7110/TRM/JH7110_TRM/system_memory_map.html
 ```
 
+The good news is that the usertests program runs without error (the puzzling sbrkmuch test does not seem to fail) on VF2 hardware.
+
+# Jtag connection
+
+I used an inexpensive FT2232H-56Q ftdi minimodule (Digikey 768-1278-ND) as a Jtag probe adapter. It lists for $29.95 in 2024.
 
 ## FT2232H-56Q minimodule Jtag wiring details
 
@@ -63,7 +36,6 @@ GPIO Pin, Signal, MiniModule pin
     39    gnd    CN2-1
     40    TDO    CN2-10
 ```
-
 Where:
 
 - TMS, TCK, TDI, TDO are normal Jtag signals
@@ -71,7 +43,45 @@ Where:
 - gnd is 0v 
 - nTRST is a GPIO on the FT2232H and configured in the jtag/openocd-ftdi.cfg file used to invoke openocd
 
-## running openocd
+Please be sure to confirm the pinout of any adapter or cabling with the vendor documentation before making any connections since improper
+interconnection can damage the board, interface or (unlikely) the host PC.
+
+# Errata
+
+## SD Card harware issue
+
+My board sometimes doesnt like to boot from the SD card. I havent figured this out yet. Sometimes I disconnect the USB Uart or Jtag from the
+host while powering the board and then reconnect as the system is booting. Sometimes I reinsert the SD card.
+
+It could be the particular model of SD card. The board always seems to boot from internal SPI (with the older firmware), but I often run with
+the newer firmware on SD in order to verify the UART workaround (see next section).
+
+## OpenSBI console input API
+
+Recent firmware seemed to break this API. Older SBI/Uboot originally loaded on the board supports it fine. As a result, I
+added a POLL_UART0_DIRECT option in param.h to avoid this API and poll the Uart Rx logic directly.
+
+This older version (on my board, in SPI flash) works fine for SBI or POLL_UART0_DIRECT:
+```
+U-Boot SPL 2021.10 (Feb 12 2023 - 18:15:33 +0800)
+```
+
+The newer version (on SD) reports an error every time a key is pressed (when using SBI or NOT using POLL_UART0_DIRECT)
+
+```
+U-Boot SPL 2021.10 (Sep 19 2024 - 15:43:53 +0800)
+```
+
+This is the error message that gets printed when POLL_UART0_DIRECT is not enabled on the newer firmare running on the VF2 board and a key is pressed:
+
+```
+$ sbi_ecall_handler: Invalid error 13 for ext=0x2 func=0x0
+sbi_ecall_handler: Invalid error 13 for ext=0x2 func=0x0
+```
+
+## Example Jtag debug session
+
+This is also covered in the README-jtag-common file but below includes an actual debug session.
 
 ```
 openocd -f openocd-ftdi.cfg
@@ -84,17 +94,8 @@ In a 3rd, invoke gdb:
 ```
 riscv64-unknown-linux-gnu-gdb kernel
 ```
-Within gdb:
-```
-(gdb) target extended-remote :3333
-(gdb) info threads
-(gdb) thread N
-(gdb) cont
-```
+Example run Within gdb:
 
-Where N is the thread currently running uboot with pc address around 0xfffxxxxx
-
-Example run:
 ```
 (gdb) target extended-remote :3333
 Remote debugging using :3333
@@ -129,9 +130,7 @@ Continuing.
 
 ```
 
-Beyond openocd invocation, this is identical to the instructions from the Jtag section of the unmatched readme.
-
-Prior to issuing the 'cont' command, insure that uboot was interrupted and not allowed to boot Linux.
+Prior to running openocd and issuing the 'cont' command, insure that uboot was interrupted and not allowed to boot Linux. It should be at the uboot prompt.
 
 The uboot terminal shows this (starting from power):
 
@@ -183,7 +182,7 @@ init: starting sh
 $
 
 ```
-Now, running usertests succeeds (unlike unmatched)!
+
 
 
 
