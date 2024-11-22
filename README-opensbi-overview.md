@@ -286,6 +286,7 @@ console        3 20 0
 $
 ```
 
+Note that only 4 of 8 cores are running on this board. This is the subject of some discussion in the README-opensbi-BananaPi-F3.md file.
 
 # Code compilation
 
