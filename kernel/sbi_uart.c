@@ -6,9 +6,9 @@
 #include "proc.h"
 #include "defs.h"
 
-#define VF2_UART_DATA_REG 0
-#define VF2_UART_STATUS_REG 5
-#define VF2_RXDATARDY_MASK 1
+#define UART_DATA_REG_16550 0
+#define UART_STATUS_REG_16550 5
+#define RXDATARDY_MASK_16550 1
 #define UNMATCHED_UART_DATA_REG 1
 
 // either uses SBI to poll the console Uart for a character or polls the UART registers direct
@@ -19,12 +19,9 @@ sbi_poll_uart0(void)
 {
 #ifdef POLL_UART0_DIRECT
   volatile int *pUart0 = (volatile int *) UART0;
-  #if defined(BOARD_VF2) && defined(BOARD_UNMATCHED)
-      #error "Choose either BOARD_VF2 or BOARD_UNMATCHED, not both"
-  #endif
-  #if defined(BOARD_VF2)
-    if (pUart0[VF2_UART_STATUS_REG] & VF2_RXDATARDY_MASK) {
-      int ch = pUart0[VF2_UART_DATA_REG] & 0xff;
+  #if defined(BOARD_VF2) || defined(BOARD_BPIF3)
+    if (pUart0[UART_STATUS_REG_16550] & RXDATARDY_MASK_16550) {
+      int ch = pUart0[UART_DATA_REG_16550] & 0xff;
       consoleintr(ch);
     }
   #elif defined(BOARD_UNMATCHED)

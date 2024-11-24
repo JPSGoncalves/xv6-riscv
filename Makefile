@@ -10,8 +10,8 @@ runtime_config := sbi
 #
 
 #board_config := unmatched
-#board_config := vf2
-board_config := bpif3
+board_config := vf2
+#board_config := bpif3
 
 K=kernel
 U=user

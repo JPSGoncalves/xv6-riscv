@@ -32,7 +32,7 @@ In summary, the observed differences beween bpif3 and other boards:
 - DDR, Uboot and OpenSBI exist at different addresses. Linux appeared to be loading around 0x10000000, so xv6 is linked
 to locate starting at this address.
 - It has 8 cores, but I have been unable to bring them all online (only 4 appear to start when requesting them from SBI using the
-published API).
+published API, with 4, 5 and 6 seemingly missing in action :).
 - As mentioned, Jtag is not available for cores 1-7 until the SOC is executing somewhere in Linux.
 - The SPL boot section appears to be cryptographically signed.
 - The realtime core runs some ".elf" file when booting Linux. I can not find the source to this .elf file.  
@@ -73,7 +73,35 @@ interconnection can damage the board, interface or (unlikely) the host PC.
 
 Fascinatingly, this board fails the usertests program frequently, but sometimes at a new place - rmdot.
 
-It may also fail at sbrkmuch (!) just like unmatched. Curious. And sometimes it passes all tests.  
+```
+...
+test subdir: OK
+test bigwrite: OK
+test bigfile: OK
+test fourteen: OK
+test rmdot: usertrap(): unexpected scause 0x2 pid=19216
+            sepc=0x6e26 stval=0x0
+FAILED
+SOME TESTS FAILED
+$
+```
+
+It may also fail at sbrkmuch (!) just like unmatched. Curious. And sometimes it passes all tests: 
+
+```
+...
+test bigdir: OK
+test manywrites: OK
+test badwrite: OK
+test execout: OK
+test diskfull: balloc: out of blocks
+balloc: out of blocks
+OK
+test outofinodes: ialloc: no inodes
+OK
+ALL TESTS PASSED
+$
+```
 
 I did not do as much detailed debugging with this board as was done on unmatched to look beyond the failure string.
 
@@ -82,13 +110,12 @@ I did not do as much detailed debugging with this board as was done on unmatched
 Its possible to run xv6 with a single core. In main.c, comment out this:
 
 ```
-    // cant start hart 1 for now since 0 was mapped to 1
-    //for (int i = 2; i < NCPU; i++)
+    // harts 0-7 (inclusive)
+    //for (int i = 0; i < NCPU; i++)
     //{
     //  if (i != boothartid)
     //  {
-    //    sbi_hart_start(i, harts_entry[i]);
-    //
+    //    sbi_hart_start(i, (unsigned long) &_entry_sbi);
     //  }
     //}
 ```
@@ -96,9 +123,7 @@ That single core will boot xv6 with a single core and jtag works with core 0 and
 
 The problem is with cores 1-7, which appear inaccessible pre-Linux. Attempts to start them with the above code is partially successful.
 
-I end up with exactly 4 cores running, and those are visible to Jtag once they are running. The others silently fail for some unknown reason.
-
-Note: I presently have a wart in the code having to do with core 1 that is the reason for starting i at 2.  This should get resolved in a next revision.
+I end up with exactly 5 cores running. Those are visible to Jtag once they are running. The others silently fail Jtag for some unknown reason.
 
 # Jtag Workaround Attempt
 
@@ -110,24 +135,32 @@ For all cores,
 ```
 reg satp 0x0
 reg sie 0x0
-reg tp = N (where N ranges from 2..7)
+reg tp = N (where N ranges from 1..7)
 reg pc = (address of) spin
 ```
 
 After loading the code with core 0 (thread 1 in gdb), xv6 runs with core 0 and all the rest are waiting at wfi at spin (label in entry_sbi.S).
 
-Next, halt the code and one by one set a core pc to ```_entry_hartN``` (where N ranges from 2..7).
+Next, halt the code and one by one initialize a hart with the hart ID in a0, and set pc to ```_entry_sbi```  
 
-All revectored cores are now running XV6.
+For example, hart 1 can enter xv6 this way (assuming it was previously at the label ```spin```):
 
-But attempts to get this to occur correctly (via SBI and also from uboot) have failed. I even tried to tuck all of the Linux cores back to SBI by first setting their PC to the new function 'park' which calles SBI to "stop" them and then try to run unmodified xv6 that asks cores 2..7 to start at the appropriate time.
+```
+reg a0=1
+reg pc=_entry_sbi
+resume
+```
 
-That plan failed, although park seems to power down the core (and Jtag cant talk to it once that happens).
+After doing this for all harts, they were confirmed running xv6. So xv6 is ok with all 8 cores, but something stuck in SBI to launch them.
+
+I tried to tuck all of the Linux cores back into SBI by first setting their PC to the new function 'park' which calles SBI to "stop" them and then try to run unmodified xv6 that calls SBI to start cores 1..7 at the appropriate time.
+
+That plan failed, although park seems to power down the core (and Jtag cant talk to it once that happens). So thats a clue.
 
 The real solution to this is to get Jtag to work while the code is running Uboot to try and figure out why they cant emerge when requested. Unresponsive cores appear to be "powered off" and the code to turn them on (so maybe they could wait at a wfi like the U74 cores do) is not
 documented (I specifically saw some undocumented register addresses getting written to in the SBI source code that power them up).
 
-This code snapshot calls SBI for cores 2-7 and ends up with 4 running cores with no error returned for the cores that dont start (yes, the return value was checked offline).
+This code snapshot calls SBI for cores 0-7 (skipping the boot core) and ends up with 5 running cores with no error returned for the cores that dont start (yes, the return value was checked offline).
 
 # Closing Thought
 

@@ -14,7 +14,7 @@
 //#endif
 
 #ifdef RUNTIME_SBI
-#define NPROC        50  // maximum number of processes
+#define NPROC        64  // maximum number of processes
 #ifdef BOARD_BPIF3
 #define NCPU          8  // maximum number of CPUs
 #else
@@ -38,15 +38,15 @@
 //
 // Board        |   POLL_UART_DIRECT   |   Comment
 // -----------------------------------------------------------------------------------------------------
-// Unmatched    |   defined            |  Use Uart access for console Rx
+// Unmatched    |   defined            |  Use Uart hw access for console Rx
 // Unmatched    |   not defined        |  Use SBI API for console Rx
-// VF2          |   defined            |  Use Uart access for console Rx
+// VF2          |   defined            |  Use Uart hw access for console Rx
 // VF2          |   not defined        |  Use SBI API for console Rx. But
 //              |                      |  does not work reliably (depends on Starfive firmware version)
-// Banana-pi F3 |   defined            |  Not yet supported
+// Banana-pi F3 |   defined            |  Use Uart hw access for console Rx
 // Banana-pi F3 |   not defined        |  Use SBI API for console Rx
 
-//#define POLL_UART0_DIRECT
+#define POLL_UART0_DIRECT
 
 // The following enforces either-or seletion of board (else redefined error)
 #ifdef BOARD_VF2

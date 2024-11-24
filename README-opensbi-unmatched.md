@@ -40,10 +40,36 @@ If the default USB Jtag interface works for you, a slightly different Jtag .cfg 
 One executable in the ramdisk is called usertests. It samples the xv6 kernel API and prints dialog on its progress. The tests
 are cleverly written with expected results (including for faults). 
 
-Unfortunately, I've met my match with the intermittent failure of one particular test on unmatched: sbrkmuch() within usertests.c. This test runs fine:
+Unfortunately, I've met my match with an intermittent failure of one particular test on unmatched: sbrkmuch() within usertests.c:
+
+```
+...
+test iref: OK
+test forktest: OK
+test sbrkbasic: OK
+test sbrkmuch: usertrap(): unexpected scause 0xd pid=6475
+            sepc=0x6a3a stval=0x11068
+FAILED
+SOME TESTS FAILED
+$
+```
+
+This test runs fine:
 
 - on the VF2 board
 - occasionally (unmodified). Run the test a few times in a row from the command prompt.
+```
+...
+test badwrite: OK
+test execout: OK
+test diskfull: balloc: out of blocks
+balloc: out of blocks
+OK
+test outofinodes: ialloc: no inodes
+OK
+ALL TESTS PASSED
+$
+```
 - when run standalone (via command line parameter to just run sbrkmuch).
 - when its moved or called differently from its original version. Please try included "usertests2" which simply reverses the call order of sbrkbasic and sbrkmuch with no other changes. Both versions are on the supplied ramdisk.
 - of course, in the original MIT QEMU emulation.

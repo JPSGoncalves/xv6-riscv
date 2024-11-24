@@ -8,61 +8,26 @@
 .section .text
 
 .global _entry
-.globl _entry_hart1
-.globl _entry_hart2
-.globl _entry_hart3
-.globl _entry_hart4
-#if defined(BOARD_BPIF3)
-.globl _entry_hart5
-.globl _entry_hart6
-.globl _entry_hart7
-.globl _entry_hart8
-#endif
+.globl _entry_sbi
+
 .globl _entry_mistake
 .extern __bss_start
 .extern __bss_end
 
 _entry:
-        # for openboot initiated launch, tp has the hart id in tp already
-        # and in the general case can be any hart
-        # 0 is reserved for siFive RT cores (unmatched, VF2) and will not enter here in tp
-#if defined(BOARD_BPIF3)
-        # processor 0 is usable on BPIF3 board (spacemit k1) and code expects tp from 1..NCPU for stack
-        # we observe processor 0 always selected for this board but presumably can range from 0-7
-        addi tp, tp, 1
-#endif
+        # for uboot initiated launch, the hart id is in tp already
+        # and is chosen randomly in in the general case
+
+        # 0 is reserved for siFive RT cores (unmatched, VF2) and wont be selected
+        # 0 is used on bpif3, however
+
         call clear_bss
         j entry_run
-        # xv6/opensbi initiated harts do not self identify hart id so when we
-        # start them in main() we direct their start address appropriately
-        # logic there prevents a request to send in the same hart as uboot did
-        # and already range from 1..max
-_entry_hart1:
-        li tp,1
-        j entry_run
-_entry_hart2:
-        li tp,2
-        j entry_run
-_entry_hart3:
-        li tp,3
-        j entry_run
-_entry_hart4:
-        li tp,4
-#if defined(BOARD_BPIF3)
-        # BPI F3 has spacemit chip with 8 usable cores
-        j entry_run
-_entry_hart5:
-        li tp,5
-        j entry_run
-_entry_hart6:
-        li tp,6
-        j entry_run
-_entry_hart7:
-        li tp,7
-        j entry_run
-_entry_hart8:
-        li tp,8
-#endif
+
+        # opensbi initiated harts identify their hart in a0
+        # xv6 needs it in tp
+_entry_sbi:
+        mv tp,a0
 entry_run:
 
         # set up a stack for C.
@@ -73,7 +38,11 @@ entry_run:
         li a0, 1024*4
         # csrr a1, mhartid
         mv a1,tp
-        # addi a1, a1, 1
+#if defined(BOARD_BPIF3)
+        # processor 0 is usable on BPIF3 board (spacemit k1) so we need to adjust for the stack calculation
+        # unmatched and SV2 enables 1..4 and uboot+main() leaves 0 inside SBI (since its not a RV64G processor)
+        addi a1, a1, 1
+#endif
         mul a0, a0, a1
         add sp, sp, a0
         # jump to start() in start.c

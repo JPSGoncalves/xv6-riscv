@@ -257,8 +257,9 @@ If the sequence is successful, the startup should be similar to this:
 
 xv6 kernel is booting
 
-hart 3 starting
 hart 2 starting
+hart 1 starting
+hart 3 starting
 hart 7 starting
 init: starting sh
 $ ls
@@ -286,7 +287,7 @@ console        3 20 0
 $
 ```
 
-Note that only 4 of 8 cores are running on this board. This is the subject of some discussion in the README-opensbi-BananaPi-F3.md file.
+Note that only 5 of 8 cores are running on this board. This is the subject of some discussion in the README-opensbi-BananaPi-F3.md file.
 
 # Code compilation
 
@@ -313,9 +314,7 @@ param.h must be used to select direct UART polling:
 The location and nature of UART Rx polling is different across the boards, so the configuration changes
 parameters necessary to perform direct uart polling (still within the timer interrupt/trap) instead of SBI API.
 
-Note that at the present time, this option is not available for the bpif3 board (mainly because I didnt code or
-test it yet). So only use this option on unmatched (optional) or vf2 (mandatory). Refer to the param.h file for
-a table of valid options depending on the board.
+This option works on all 3 boards in the 3.1 release. So only use this option on unmatched and bpif3 (optional) or vf2 (mandatory). Refer to the param.h file for a table of valid options depending on the board.
 
 With options chosen, compile the code using riscv64-linux-gnu compiler tools that are available in your path. On debian, this command both installs the required tools and inserts it into your PATH:
 
