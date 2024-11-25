@@ -20,12 +20,12 @@ small utility is provided to repopulate this image into the #included ramdisk he
 
 Given that there are no device interrupts, a trick is employed to get SBI console input. The timer interrupt is used 
 to poll for keyboard input, either via SBI API call or directly to the underlying hardware (e.g. sifive uart or 
-8250/16550 as used on vf2). The timer interrupt is calibrated for approx 10x per second on the various boards as
+8250/16550 as used on vf2 and bpif3). The timer interrupt is calibrated for approx 10x per second on the various boards as
 was done in QEMU, so this provides sufficient polling rate for console characters.
 
 # Quick Start
 
-For quick start, Git release v0.3 includes a zip file containing board specific kernel.bin files that can be run from uboot (each in their own subdirectory).
+For quick start, Git release v0.3.1 includes a zip file containing board specific kernel.bin files that can be run from uboot (each in their own subdirectory).
 
 This is how to run them:
 
@@ -287,7 +287,7 @@ console        3 20 0
 $
 ```
 
-Note that only 5 of 8 cores are running on this board. This is the subject of some discussion in the README-opensbi-BananaPi-F3.md file.
+Note that only 5 of 8 cores are running on this board (four "starting" and hart 0 starting them). This is the subject of some discussion in the README-opensbi-BananaPi-F3.md file.
 
 # Code compilation
 
@@ -304,7 +304,7 @@ Then choose one of the following board specific configurations (shown here is th
 board_config := bpif3
 ```
 
-Unfortunately, not all vendor implementations support SBI console polling (vf2), so for this board a define in
+Unfortunately, not all vendor implementations support SBI console polling (vf2), so for that board, the following define in
 param.h must be used to select direct UART polling:
 
 ```
@@ -314,7 +314,7 @@ param.h must be used to select direct UART polling:
 The location and nature of UART Rx polling is different across the boards, so the configuration changes
 parameters necessary to perform direct uart polling (still within the timer interrupt/trap) instead of SBI API.
 
-This option works on all 3 boards in the 3.1 release. So only use this option on unmatched and bpif3 (optional) or vf2 (mandatory). Refer to the param.h file for a table of valid options depending on the board.
+The POLL_UART0_DIRECT option works on all 3 boards in the 0.3.1 release. So its ok to use this option on unmatched and bpif3 too. Refer to the param.h file for a table of valid options depending on the board.
 
 With options chosen, compile the code using riscv64-linux-gnu compiler tools that are available in your path. On debian, this command both installs the required tools and inserts it into your PATH:
 
@@ -373,7 +373,7 @@ Coming from a professional embedded firmware development background, I prefer th
 Note that the apt install from Debian does not include the riscv64 version of gdb, so it is necessary to
 get that elsewhere (refer to Jtag info README).
 
-I am using ```riscv64-unknown-linux-gnu-gdb``` for Jtag debug sessions. Refer to a TBD Jtag README for generic info and the board specific README for additional info.
+I am using ```riscv64-unknown-linux-gnu-gdb``` for Jtag debug sessions. Refer to the README-Jtag-common README for debug tips and the board specific README for additional info.
 
 # Ideas for Next Steps
 
@@ -390,9 +390,9 @@ Other ideas:
 - Add user mode gpio support?
 - Add framebuffer support for video console to avoid having to hook up debug uart?
 - Add support for other interesting peripherals? It would be great to boot from nvme but that may be very far off given how much code is needed to support a disk device.
-- Your contribution? (via pull request please)
 
-
+Your feedback:
+- If you have any idea why the unmatched and bpif3 boards intermittently fail usertests, please create an "issue" documenting it or pull request if you have any solutions or enhancements to share. Thank you!
 
 
 
