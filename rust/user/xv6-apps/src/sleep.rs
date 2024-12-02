@@ -1,8 +1,7 @@
 #![no_main]
 #![no_std]
 
-use core::ffi::{c_int, c_char};
-use xv6rs_user::{sleep, exit};
+use xv6_usys::{sleep, exit};
 
 use panic_halt as _;
 

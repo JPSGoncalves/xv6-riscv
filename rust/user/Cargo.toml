@@ -1,17 +1,7 @@
-[package]
-name = "user"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "2"
 
-[dependencies]
-panic-halt = "0.2.0"
-
-[lib]
-name = "xv6rs_user"
-path="src/lib.rs"
-crate-type = ["staticlib", "rlib"] # Creates static lib
-
-[[bin]]
-name="sleep"
-path="src/sleep.rs"
-
+members = [
+    "xv6-apps",
+    "xv6-user-sys",
+]
