@@ -38,3 +38,8 @@ rustflags = [
 
 [alias]
 crosscc = "build --target=riscv64gc-unknown-none-elf"
+#crosscc = "build --target=riscv64gc-unknown-linux-gnu"
+
+[target.riscv64gc-unknown-linux-gnu]
+#rustflags = ["-C", "default-linker-libraries=false", "-C", "panic=abort"]
+rustflags = ["-C", "link-arg=-nostartfiles", "-C", "link-arg=-T/home/jpgoncalves/source/xv6-riscv/user/user.ld"]
