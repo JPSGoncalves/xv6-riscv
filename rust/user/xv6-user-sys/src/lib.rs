@@ -7,14 +7,6 @@ use core::ffi::{c_int, c_void};
 
 mod bidings;
 
-pub fn sleep(sec: i32) -> i32 {
-    unsafe { bidings::sleep(sec) }
-}
-
-pub fn exit(code: i32) -> ! {
-    unsafe { bidings::exit(code) }
-}
-
 pub fn println(line: &str) {
     unsafe {
         bidings::write(1, line.as_ptr() as *const c_void, line.len() as i32);
@@ -23,10 +15,10 @@ pub fn println(line: &str) {
 }
 
 #[no_mangle]
-extern "C" fn main() -> c_int {
+pub unsafe extern "C" fn main() -> c_int {
 
     println("Entering sleep from Rust!");
-    sleep(10);
-    println("Goodby from Rust!");
-    exit(0);
+    //sleep(10);
+    //println("Goodby from Rust!");
+    unsafe { bidings::exit(0) }
 }

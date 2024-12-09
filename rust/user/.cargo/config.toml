@@ -42,5 +42,5 @@ crosscc = "build --target=riscv64gc-unknown-none-elf"
 
 [target.riscv64gc-unknown-none-elf]
 #rustflags = ["-C", "default-linker-libraries=false", "-C", "panic=abort"]
-rustflags = ["-C", "link-arg=-T/home/jpgoncalves/source/xv6-riscv/user/user.ld", "-C", "link-arg=-Map=output.map", "-C", "link-args= -z max-page-size=4096"]
+rustflags = ["-C", "link-arg=-T/home/jpgoncalves/source/xv6-riscv/user/user.ld", "-C", "link-arg=-Map=output.map"]
 #"-C", "-z max-page-size=4096"]

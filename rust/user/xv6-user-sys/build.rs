@@ -28,5 +28,13 @@ fn main() {
         .flag("-ffreestanding")
         .flag("-nostdlib")
         .flag("-mabi=lp64d")
+        .flag("-mno-relax")
+        .flag("-fno-common")
+        .flag("-mcmodel=medany")
         .compile("xv6-usys");
+
+    // Add linker arguments to retain all symbols in the library
+    println!("cargo:rustc-link-arg=-Wl,--whole-archive");
+    println!("cargo:rustc-link-lib=static=xv6-usys");
+    println!("cargo:rustc-link-arg=-Wl,--no-whole-archive");
 }

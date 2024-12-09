@@ -134,7 +134,7 @@ UPROGS=\
 	$U/_zombie\
 
 fs.img: mkfs/mkfs README $(UPROGS)
-	mkfs/mkfs fs.img README $(UPROGS)
+	mkfs/mkfs fs.img README $(UPROGS) $U/_sleep
 
 -include kernel/*.d user/*.d
 
