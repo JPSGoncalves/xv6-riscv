@@ -134,11 +134,11 @@ UPROGS=\
 	$U/_zombie\
 	$U/_sleep\
 	$U/_copy\
-	$U/_copy\
 	$U/_open\
 	$U/_fork\
 	$U/_exec\
 	$U/_forkexec\
+	$U/_redirect\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
