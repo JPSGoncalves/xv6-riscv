@@ -134,6 +134,8 @@ UPROGS=\
 	$U/_zombie\
 	$U/_sleep\
 	$U/_copy\
+	$U/_copy\
+	$U/_open\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
