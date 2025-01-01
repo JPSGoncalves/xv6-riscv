@@ -139,6 +139,8 @@ UPROGS=\
 	$U/_exec\
 	$U/_forkexec\
 	$U/_redirect\
+	$U/_pipe1\
+	$U/_pipe2\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
