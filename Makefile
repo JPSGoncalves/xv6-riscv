@@ -137,6 +137,7 @@ UPROGS=\
 	$U/_copy\
 	$U/_open\
 	$U/_fork\
+	$U/_exec\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
