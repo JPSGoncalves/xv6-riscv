@@ -93,5 +93,11 @@ sys_uptime(void)
 uint64
 sys_trace(void)
 {
+  struct proc *p = myproc();
+  int tracemask;
+
+  argint(0, &tracemask);
+  p->tracemask = tracemask;
+
   return 0;
 }
